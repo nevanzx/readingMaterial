@@ -271,8 +271,9 @@ if st.session_state.chapters_data:
                     Chapter: {chapter_name}
                     Topics: {', '.join(topics)}
 
-                    For each topic, generate 3-5 paragraphs depending on the complexity and length of explanation needed.
-                    Ensure the content is comprehensive, well-structured, and suitable for college-level students. Add a summary at the end with title.
+                    - For each topic, generate 3-5 paragraphs depending on the complexity and length of explanation needed.
+                    - Ensure the content is comprehensive, well-structured, and suitable for college-level students. 
+                    - Add a summary at the end with title.
                     """
 
                     try:

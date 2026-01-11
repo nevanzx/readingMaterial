@@ -4,6 +4,7 @@ import os
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Inches, Pt
+from docx.oxml.shared import OxmlElement, qn
 import requests
 import tempfile
 from io import BytesIO
@@ -120,10 +121,10 @@ def generate_image_from_prompt(prompt, ratio="1:1", size="4", api_key=None):
         print(f"Error preparing Gemini 3 Pro Image Preview API call: {e}")
         return None
 
-# Function to add images to a paragraph
+# Function to add images to a paragraph with square text wrapping
 def add_image_to_doc(doc, image_file, width=None, height=None, position='center'):
     """
-    Adds an image to the document with specified positioning.
+    Adds an image to the document with specified positioning and square text wrapping.
     """
     # Create a temporary file to save the image stream
     if hasattr(image_file, 'name') and hasattr(image_file, 'getvalue'):
@@ -150,8 +151,13 @@ def add_image_to_doc(doc, image_file, width=None, height=None, position='center'
         run = paragraph.add_run()
         picture = run.add_picture(tmp_img_path, width=width, height=height)
 
-        # Note: To achieve square wrapping layout in Word, the image is positioned
-        # with the appropriate spacing to create a square-like layout effect
+        # Get the picture element to modify its properties for square text wrapping
+        pic = picture._inline
+        # Set the distance from text - this affects the square wrapping appearance
+        pic.dist_t = 0  # Distance from top
+        pic.dist_b = 0  # Distance from bottom
+        pic.dist_l = 114300  # Distance from left (in EMUs - 114300 EMUs = 0.1 inch)
+        pic.dist_r = 114300  # Distance from right (in EMUs - 114300 EMUs = 0.1 inch)
 
         # Add some spacing after the image
         paragraph.paragraph_format.space_after = Inches(0.0833)  # 6/72 inches
@@ -307,8 +313,8 @@ if uploaded_file is not None:
                     {course_outline_text}
                     """
 
-                    # Determine which Gemini API key to use based on image generation toggle
-                    api_key_to_use = nano_banana_gemini_api_key if enable_image_generation and nano_banana_gemini_api_key else gemini_api_key
+                    # Use only the regular Gemini API key for outline generation (nano_banana is only for images)
+                    api_key_to_use = gemini_api_key
 
                     # Make request to Gemini API
                     # For Gemini API, the key should be passed as a query parameter or in the URL

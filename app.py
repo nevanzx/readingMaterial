@@ -42,7 +42,7 @@ def add_formatted_text(paragraph, text):
             run.italic = italic
 
 # Function to generate image from prompt using an image generation API
-def generate_image_from_prompt(prompt, api_key):
+def generate_image_from_prompt(prompt, ratio="1:1", size="4", api_key=None):
     """
     Generates an image from a prompt using the Gemini 3 Pro Image Preview model via the SDK.
     This function calls the Google's image generation API to generate the image.
@@ -67,14 +67,19 @@ def generate_image_from_prompt(prompt, api_key):
         try:
             client = genai.Client(api_key=api_key)
 
-            # Randomly select image size from options: 2x2.5", 2.5x2", 3x3.5", 3.5x3", or 3.5x6"
-            # Also specify resolution limit to not exceed 480p
-            import random
-            image_sizes = ["2x2.5", "2.5x2", "3x3.5", "3.5x3", "3.5x6"]
-            selected_size = random.choice(image_sizes)
+            # Map ratio and size to appropriate inch dimensions
+            ratio_map = {
+                "16:9": (size, size * 9/16),  # For 16:9, if width is 'size', height is size * 9/16
+                "4:3": (size, size * 3/4),    # For 4:3, if width is 'size', height is size * 3/4
+                "3:4": (size * 3/4, size),    # For 3:4, if height is 'size', width is size * 3/4
+                "1:1": (size, size)           # For 1:1, both dimensions are 'size'
+            }
 
-            # Enhance prompt with size and resolution requirements
-            full_prompt = f"{prompt}. Generate image with dimensions {selected_size} inches at 72 DPI (not exceeding 480 pixels in any dimension). Maintain aspect ratio of {selected_size.replace('x', ':')}."
+            # Get the mapped dimensions
+            width_in, height_in = ratio_map.get(ratio, (4, 4))  # Default to 4x4 if ratio not recognized
+
+            # Enhance prompt with ratio and resolution requirements
+            full_prompt = f"{prompt}. Generate image with {ratio} aspect ratio at 1K resolution. Focus on maintaining the specified aspect ratio."
 
             # Call the API without the problematic response_mime_type config
             response = client.models.generate_content(
@@ -143,7 +148,10 @@ def add_image_to_doc(doc, image_file, width=None, height=None, position='center'
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER  # Default center
 
         run = paragraph.add_run()
-        run.add_picture(tmp_img_path, width=width, height=height)
+        picture = run.add_picture(tmp_img_path, width=width, height=height)
+
+        # Note: To achieve square wrapping layout in Word, the image is positioned
+        # with the appropriate spacing to create a square-like layout effect
 
         # Add some spacing after the image
         paragraph.paragraph_format.space_after = Inches(0.0833)  # 6/72 inches
@@ -220,6 +228,14 @@ with st.sidebar:
         )
     else:
         num_images_per_chapter = 0
+
+    # Context locality dropdown
+    context_locality = st.selectbox(
+        "Select context locality",
+        options=["Philippines", "International", "Both"],
+        index=0,  # Default to Philippines
+        help="Choose the context for the generated content"
+    )
 
     # Temperature setting for Deepseek
     deepseek_temperature = st.slider("Deepseek Temperature", min_value=0.0, max_value=1.0, value=0.6, step=0.1)
@@ -445,6 +461,7 @@ if st.session_state.chapters_data:
                     - Use <b> and </b> for bold formatting (for key terms, definitions, important concepts)
                     - Use <i> and </i> for italic formatting (for examples, clarifications, or special notes)
 
+                    Context locality: {context_locality}
                     Chapter: {chapter_name}
                     Topics: {', '.join(topics)}
 
@@ -456,6 +473,8 @@ if st.session_state.chapters_data:
                       * Author, A. A. (Year). Title of work. Publisher. URL (if applicable)
                       * For journal articles: Author, A. A. (Year). Title of article. Title of Periodical, volume(issue), pages. https://doi.org/xx.xxx/yyyy
                       * For online sources: Author, A. A. (Year, Month Date). Title of webpage. Site Name. URL
+                    - When context locality is 'Philippines' or 'Both', incorporate relevant examples, case studies, and references from the Philippines context if possible. but do not over use "In the Philippines" and the likes phrasing. Write it as if you are from the Philippines.
+                    - When context locality is 'International' or 'Both', include global examples and perspectives.
                     """
 
                     # If image generation is enabled, modify the prompt to include image generation
@@ -472,6 +491,8 @@ if st.session_state.chapters_data:
                         ADDITIONAL REQUIREMENTS FOR IMAGE GENERATION:
                         - For {num_images_to_generate} of the topics ({selected_topics_str}), also generate an image prompt that describes a relevant visual representation for the topic.
                         - Add an "image_prompt" field to the topic object for topics that should have images.
+                        - Add a "ratio" field with one of these values: "16:9", "4:3", "3:4", or "1:1" based on what fits best for the image content.
+                        - Add a "size" field with one of these values: "6" for 16:9, "3" for 4:3, "4" for 3:4, or "4" for 1:1 based on the chosen ratio.
                         - The image_prompt should be a detailed description that could be used to generate an appropriate educational image.
                         - Example topic structure with image prompt:
                         {{
@@ -481,9 +502,12 @@ if st.session_state.chapters_data:
                                 "Content paragraph 2",
                                 "Content paragraph 3"
                             ],
-                            "image_prompt": "A detailed description of an image that visually represents this topic..."
+                            "image_prompt": "A detailed description of an image that visually represents this topic...",
+                            "ratio": "16:9",
+                            "size": "6"
                         }}
-                        - Only add the image_prompt field to {num_images_to_generate} topics that would benefit most from a visual representation.
+                        - Only add the image_prompt, ratio, and size fields to {num_images_to_generate} topics that would benefit most from a visual representation.
+                        - Use 1K resolution for all generated images.
                         """
                     else:
                         prompt = base_prompt
@@ -607,6 +631,8 @@ if st.session_state.generated_materials:
 
                     # Check if this topic has an image prompt and if image generation is enabled
                     image_prompt = topic.get("image_prompt")
+                    image_ratio = topic.get("ratio", "1:1")  # Default to square if no ratio specified
+                    image_size = float(topic.get("size", "4"))  # Default to 4 inches if no size specified
                     image_generated = None
 
                     if enable_image_generation and image_prompt:
@@ -617,8 +643,8 @@ if st.session_state.generated_materials:
                         if image_key in st.session_state.image_cache:
                             image_generated = st.session_state.image_cache[image_key]
                         else:
-                            # Generate image from prompt using Nano Banana Pro Gemini API
-                            image_generated = generate_image_from_prompt(image_prompt, nano_banana_gemini_api_key)
+                            # Generate image from prompt using Nano Banana Pro Gemini API with ratio and size
+                            image_generated = generate_image_from_prompt(image_prompt, image_ratio, image_size, nano_banana_gemini_api_key)
                             # Cache the generated image path
                             if image_generated:
                                 st.session_state.image_cache[image_key] = image_generated
@@ -647,10 +673,23 @@ if st.session_state.generated_materials:
                                 # Determine position (left or right) randomly for variety
                                 import random
                                 position = random.choice(['left', 'right'])
-                                # Randomly select image size from options: 2x2.5", 2.5x2", 3x3.5", 3.5x3", or 3.5x6"
-                                image_sizes = [(2.0, 2.5), (2.5, 2.0), (3.0, 3.5), (3.5, 3.0), (3.5, 6.0)]
-                                width_in, height_in = random.choice(image_sizes)
-                                # Add image with randomly selected dimensions, random placement
+                                # Use standardized dimensions based on the ratio and size from the topic
+                                ratio = topic.get("ratio", "1:1")
+                                size = float(topic.get("size", "4"))
+
+                                # Calculate dimensions based on ratio
+                                if ratio == "16:9":
+                                    width_in, height_in = size, size * 9/16
+                                elif ratio == "4:3":
+                                    width_in, height_in = size, size * 3/4
+                                elif ratio == "3:4":
+                                    width_in, height_in = size * 3/4, size
+                                elif ratio == "1:1":  # Square
+                                    width_in, height_in = size, size
+                                else:  # Default to square
+                                    width_in, height_in = size, size
+
+                                # Add image with standardized dimensions based on ratio, random placement
                                 add_image_to_doc(doc, image_generated,
                                                width=Inches(width_in), height=Inches(height_in),
                                                position=position)
@@ -672,10 +711,23 @@ if st.session_state.generated_materials:
                             # Determine position (left or right) randomly for variety
                             import random
                             position = random.choice(['left', 'right'])
-                            # Randomly select image size from options: 2x2.5", 2.5x2", 3x3.5", 3.5x3", or 3.5x6"
-                            image_sizes = [(2.0, 2.5), (2.5, 2.0), (3.0, 3.5), (3.5, 3.0), (3.5, 6.0)]
-                            width_in, height_in = random.choice(image_sizes)
-                            # Add image with randomly selected dimensions, random placement
+                            # Use standardized dimensions based on the ratio and size from the topic
+                            ratio = topic.get("ratio", "1:1")
+                            size = float(topic.get("size", "4"))
+
+                            # Calculate dimensions based on ratio
+                            if ratio == "16:9":
+                                width_in, height_in = size, size * 9/16
+                            elif ratio == "4:3":
+                                width_in, height_in = size, size * 3/4
+                            elif ratio == "3:4":
+                                width_in, height_in = size * 3/4, size
+                            elif ratio == "1:1":  # Square
+                                width_in, height_in = size, size
+                            else:  # Default to square
+                                width_in, height_in = size, size
+
+                            # Add image with standardized dimensions based on ratio, random placement
                             add_image_to_doc(doc, image_generated,
                                            width=Inches(width_in), height=Inches(height_in),
                                            position=position)

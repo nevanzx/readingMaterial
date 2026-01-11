@@ -1,6 +1,6 @@
 streamlit
 python-docx
 requests
-google-generativeai
+google-genai
 pillow
 protobuf

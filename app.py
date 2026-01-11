@@ -292,11 +292,11 @@ if uploaded_file is not None:
                     # Prepare the prompt for Gemini
                     prompt = f"""
                     Analyze the following course outline and extract chapters and topics in JSON format.
-                    The JSON should have a structure like this:
+                    The JSON should have this required structure like this:
                     {{
                         "chapters": [
                             {{
-                                "chapter": "Chapter Name",
+                                "chapter": "Chapter 1: Name",
                                 "topics": ["Topic 1", "Topic 2", "Topic 3"]
                             }}
                         ]

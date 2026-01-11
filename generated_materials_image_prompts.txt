@@ -1,0 +1,16 @@
+Generated Image Prompts:
+
+Chapter: Chapter 6: Financial Health Check (Technical Start)
+Topic: Calculation: Net Worth (Assets - Liabilities)
+Prompt: An educational infographic showing a balance sheet with two columns: on the left, 'Assets' listed with icons for cash (PHP bills), bank savings (a BPI or BDO logo), real estate (a house sketch), and investments (a stock chart); on the right, 'Liabilities' with icons for loans (a document with 'Pag-IBIG' text), credit cards, and mortgages. Arrows point from each column to a central calculation: 'Net Worth = Assets - Liabilities', with a result displayed in Philippine pesos. The background includes subtle Filipino motifs like geometric patterns. The style is clean and professional, suitable for college-level learning.
+---
+
+Chapter: Chapter 6: Financial Health Check (Technical Start)
+Topic: Calculation: Personal Cash Flow (Income - Expense)
+Prompt: A flowchart diagram illustrating personal cash flow: starting with 'Income Sources' (boxes labeled Salary, Freelance, Investments) flowing into a central 'Total Income' node, then branching to 'Expense Categories' (boxes for Housing, Food, Transportation, Savings) leading to 'Total Expenses'. An arrow from 'Total Income' to 'Total Expenses' shows subtraction, resulting in 'Net Cash Flow' (positive or negative). Icons include Philippine peso symbols, a laptop for freelance work, and a jeepney for local context. The design is vibrant and clear, with colors differentiating income and expense streams.
+---
+
+Chapter: Chapter 6: Financial Health Check (Technical Start)
+Topic: Solvency analysis: Long-term financial stability
+Prompt: A timeline chart showing solvency analysis over 20 years: the x-axis represents years (e.g., from 2024 to 2044), and the y-axis shows values in Philippine pesos. Two lines plot 'Total Assets' (increasing curve with icons for property, stocks, savings) and 'Total Liabilities' (decreasing curve with icons for loans being paid off). Arrows indicate key life events like 'Buy Home', 'Retirement', and 'Education Funding'. The chart includes a shaded area for 'Debt-to-Asset Ratio' below 50% as healthy. The design is professional with a color scheme of blues and greens, and annotations in English with peso symbols.
+---

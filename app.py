@@ -194,6 +194,14 @@ if 'image_cache' not in st.session_state:
     st.session_state.image_cache = {}  # Cache generated images
 if 'generation_complete' not in st.session_state:
     st.session_state.generation_complete = False  # Flag to indicate generation is done
+if 'json_file_uploaded' not in st.session_state:
+    st.session_state.json_file_uploaded = False  # Flag to indicate if JSON file was uploaded
+if 'full_materials_json' not in st.session_state:
+    st.session_state.full_materials_json = None  # Stores complete materials JSON if uploaded
+if 'image_prompts_txt' not in st.session_state:
+    st.session_state.image_prompts_txt = None  # Stores image prompts text for download
+if 'original_filename' not in st.session_state:
+    st.session_state.original_filename = None  # Stores original uploaded filename
 
 # Sidebar for API keys
 with st.sidebar:
@@ -219,6 +227,21 @@ with st.sidebar:
         gemini_api_key = st.text_input("Gemini API Key", type="password")
         nano_banana_gemini_api_key = st.text_input("Nano Banana Pro Gemini API Key", type="password")
         deepseek_api_key = st.text_input("Deepseek API Key", type="password")
+
+    # Toggle for saving image prompts to text file
+    save_prompts_to_txt = st.toggle("Generate Image Prompts to Text File", value=False)
+
+    # Show number of images to generate when toggle is enabled
+    if save_prompts_to_txt:
+        num_images_for_txt = st.number_input(
+            "Number of images per chapter (for text file)",
+            min_value=1,
+            max_value=10,
+            value=3,
+            step=1
+        )
+    else:
+        num_images_for_txt = 0
 
     # Toggle for image generation from Nano Banana Pro
     enable_image_generation = st.toggle("Enable Image Generation from Nano Banana Pro", value=False)
@@ -247,126 +270,216 @@ with st.sidebar:
     deepseek_temperature = st.slider("Deepseek Temperature", min_value=0.0, max_value=1.0, value=0.6, step=0.1)
 
 st.markdown("### Step 1: Upload Course Outline")
-st.markdown("Upload a DOCX file containing your course outline and checklist")
+st.markdown("Upload a DOCX file containing your course outline and checklist or upload a previously saved JSON file")
 
-# File upload
-uploaded_file = st.file_uploader("Choose a DOCX file", type=["docx"])
+# Tabs for choosing between DOCX upload or JSON upload
+tab1, tab2 = st.tabs(["Upload DOCX File", "Upload Saved JSON File"])
 
-if uploaded_file is not None:
-    st.session_state.course_outline = uploaded_file
-    st.success(f"File '{uploaded_file.name}' uploaded successfully!")
+with tab1:
+    # File upload
+    uploaded_file = st.file_uploader("Choose a DOCX file", type=["docx"])
 
-    # Display file info
-    st.write(f"File size: {uploaded_file.size} bytes")
+    if uploaded_file is not None:
+        st.session_state.course_outline = uploaded_file
+        st.session_state.original_filename = os.path.splitext(uploaded_file.name)[0]  # Store base filename without extension
+        st.success(f"File '{uploaded_file.name}' uploaded successfully!")
 
-    # Note: Image generation is now handled automatically when Deepseek generates content with image prompts
-    if enable_image_generation:
-        st.info("Image generation is handled automatically when Deepseek generates content with image prompts")
+        # Display file info
+        st.write(f"File size: {uploaded_file.size} bytes")
 
-    # Process the document
-    if st.button("Process Course Outline with Gemini"):
-        # Check for appropriate API key based on toggle
-        if enable_image_generation and not nano_banana_gemini_api_key:
-            st.error("Please enter your Nano Banana Pro Gemini API key in the sidebar")
-        elif not enable_image_generation and not gemini_api_key:
-            st.error("Please enter your Gemini API key in the sidebar")
-        else:
-            with st.spinner("Processing with Gemini 2.5..."):
-                # Extract text from the uploaded DOCX file
-                from docx import Document as DocxDocument
-                doc = DocxDocument(uploaded_file)
+        # Note: Image generation is now handled automatically when Deepseek generates content with image prompts
+        if enable_image_generation:
+            st.info("Image generation is handled automatically when Deepseek generates content with image prompts")
 
-                # Extract all text from the document
-                full_text = []
-                for paragraph in doc.paragraphs:
-                    full_text.append(paragraph.text)
+        # Process the document
+        if st.button("Process Course Outline with Gemini"):
+            # Check for appropriate API key based on toggle
+            if enable_image_generation and not nano_banana_gemini_api_key:
+                st.error("Please enter your Nano Banana Pro Gemini API key in the sidebar")
+            elif not enable_image_generation and not gemini_api_key:
+                st.error("Please enter your Gemini API key in the sidebar")
+            else:
+                with st.spinner("Processing with Gemini 2.5..."):
+                    # Extract text from the uploaded DOCX file
+                    from docx import Document as DocxDocument
+                    doc = DocxDocument(uploaded_file)
 
-                # Extract text from tables if any
-                for table in doc.tables:
-                    for row in table.rows:
-                        for cell in row.cells:
-                            full_text.append(cell.text)
+                    # Extract all text from the document
+                    full_text = []
+                    for paragraph in doc.paragraphs:
+                        full_text.append(paragraph.text)
 
-                course_outline_text = "\n".join(full_text)
+                    # Extract text from tables if any
+                    for table in doc.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                full_text.append(cell.text)
 
-                # Call Gemini API to extract chapters and topics
-                try:
-                    headers = {
-                        "Content-Type": "application/json"
-                    }
+                    course_outline_text = "\n".join(full_text)
 
-                    # Prepare the prompt for Gemini
-                    prompt = f"""
-                    Analyze the following course outline and extract chapters and topics in JSON format.
-                    The JSON should have this required structure like this:
-                    {{
-                        "chapters": [
-                            {{
-                                "chapter": "Chapter 1: Name",
-                                "topics": ["Topic 1", "Topic 2", "Topic 3"]
-                            }}
-                        ]
-                    }}
-
-                    Ensure that topics are specific and detailed enough to generate comprehensive reading materials.
-                    Course Outline:
-                    {course_outline_text}
-                    """
-
-                    # Use only the regular Gemini API key for outline generation (nano_banana is only for images)
-                    api_key_to_use = gemini_api_key
-
-                    # Make request to Gemini API
-                    # For Gemini API, the key should be passed as a query parameter or in the URL
-                    import urllib.parse
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={urllib.parse.quote(api_key_to_use)}"
-
-                    response = requests.post(
-                        url,
-                        headers={"Content-Type": "application/json"},
-                        json={
-                            "contents": [{
-                                "parts": [{
-                                    "text": prompt
-                                }]
-                            }]
+                    # Call Gemini API to extract chapters and topics
+                    try:
+                        headers = {
+                            "Content-Type": "application/json"
                         }
-                    )
 
-                    if response.status_code == 200:
-                        result = response.json()
+                        # Prepare the prompt for Gemini
+                        prompt = f"""
+                        Analyze the following course outline and extract chapters and topics in JSON format.
+                        The JSON should have this required structure like this:
+                        {{
+                            "chapters": [
+                                {{
+                                    "chapter": "Chapter 1: Name",
+                                    "topics": ["Topic 1", "Topic 2", "Topic 3"]
+                                }}
+                            ]
+                        }}
 
-                        # Extract the text response
-                        text_response = result['candidates'][0]['content']['parts'][0]['text']
+                        Ensure that topics are specific and detailed enough to generate comprehensive reading materials.
+                        Course Outline:
+                        {course_outline_text}
+                        """
 
-                        # Find the JSON part in the response
-                        import re
-                        json_match = re.search(r'\{.*\}', text_response, re.DOTALL)
+                        # Use only the regular Gemini API key for outline generation (nano_banana is only for images)
+                        api_key_to_use = gemini_api_key
 
-                        if json_match:
-                            json_str = json_match.group()
-                            st.session_state.chapters_data = json.loads(json_str)
+                        # Make request to Gemini API
+                        # For Gemini API, the key should be passed as a query parameter or in the URL
+                        import urllib.parse
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={urllib.parse.quote(api_key_to_use)}"
 
-                            # Clear selected chapters
-                            st.session_state.selected_chapters = []
+                        response = requests.post(
+                            url,
+                            headers={"Content-Type": "application/json"},
+                            json={
+                                "contents": [{
+                                    "parts": [{
+                                        "text": prompt
+                                    }]
+                                }]
+                            }
+                        )
 
-                            st.success("Course outline processed successfully!")
-                            st.session_state.processing_status = "processed"
+                        if response.status_code == 200:
+                            result = response.json()
+
+                            # Extract the text response
+                            text_response = result['candidates'][0]['content']['parts'][0]['text']
+
+                            # Find the JSON part in the response
+                            import re
+                            json_match = re.search(r'\{.*\}', text_response, re.DOTALL)
+
+                            if json_match:
+                                json_str = json_match.group()
+                                st.session_state.chapters_data = json.loads(json_str)
+
+                                # Clear selected chapters
+                                st.session_state.selected_chapters = []
+
+                                # Reset the flag since we're using Gemini
+                                st.session_state.json_file_uploaded = False
+
+                                st.success("Course outline processed successfully!")
+                                st.session_state.processing_status = "processed"
+                            else:
+                                st.error("Could not extract JSON from Gemini response")
                         else:
-                            st.error("Could not extract JSON from Gemini response")
-                    else:
-                        st.error(f"Gemini API error: {response.status_code} - {response.text}")
+                            st.error(f"Gemini API error: {response.status_code} - {response.text}")
 
-                except requests.exceptions.RequestException as e:
-                    st.error(f"Network error while processing with Gemini: {str(e)}")
-                except json.JSONDecodeError:
-                    st.error("Invalid JSON response from Gemini API")
-                except Exception as e:
-                    st.error(f"Unexpected error while processing with Gemini: {str(e)}")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Network error while processing with Gemini: {str(e)}")
+                    except json.JSONDecodeError:
+                        st.error("Invalid JSON response from Gemini API")
+                    except Exception as e:
+                        st.error(f"Unexpected error while processing with Gemini: {str(e)}")
+
+with tab2:
+    # JSON file upload
+    uploaded_json = st.file_uploader("Choose a saved JSON file", type=["json"])
+
+    if uploaded_json is not None:
+        try:
+            # Load the JSON data
+            json_data = json.load(uploaded_json)
+
+            # Extract base filename from the uploaded JSON file name (without extension)
+            json_base_filename = os.path.splitext(uploaded_json.name)[0]
+
+            # Check if this is a generated materials JSON (has title, introduction, topics, summary, references)
+            if all(key in json_data for key in ["title", "introduction", "topics", "summary", "references"]):
+                # This is a generated materials JSON file with complete content
+                # We need to convert it to the chapters_data format for the UI
+                chapters_data = {
+                    "chapters": []
+                }
+
+                # Extract chapter info from the material
+                title = json_data.get("title", "Untitled Chapter")
+                topics = []
+
+                # Extract topic names from the material's topics
+                for topic in json_data.get("topics", []):
+                    topic_name = topic.get("topic", "Untitled Topic")
+                    topics.append(topic_name)
+
+                chapters_data["chapters"].append({
+                    "chapter": title,
+                    "topics": topics
+                })
+
+                st.session_state.chapters_data = chapters_data
+                st.session_state.selected_chapters = []
+
+                # Set the flag to indicate JSON file was uploaded
+                st.session_state.json_file_uploaded = True
+                # Store the complete material data in a separate variable to indicate it has full content
+                st.session_state.full_materials_json = {title: json_data}
+                # Store the JSON filename as the original filename for image prompts
+                st.session_state.original_filename = json_base_filename
+
+                st.success("Generated materials JSON file loaded successfully!")
+                st.session_state.processing_status = "processed"
+            elif "chapters" in json_data and isinstance(json_data["chapters"], list):
+                # This is a chapter outline JSON file
+                st.session_state.chapters_data = json_data
+                st.session_state.selected_chapters = []
+
+                # Set the flag to indicate JSON file was uploaded
+                st.session_state.json_file_uploaded = True
+                # Store the JSON filename as the original filename for image prompts
+                st.session_state.original_filename = json_base_filename
+                # Clear any previous full materials JSON
+                if hasattr(st.session_state, 'full_materials_json'):
+                    del st.session_state.full_materials_json
+
+                st.success("Chapter outline JSON file loaded successfully!")
+                st.session_state.processing_status = "processed"
+            else:
+                st.error("Invalid JSON format. The file should contain either a 'chapters' array or complete material data with 'title', 'introduction', etc.")
+        except json.JSONDecodeError:
+            st.error("Invalid JSON file format.")
+        except Exception as e:
+            st.error(f"Error loading JSON file: {str(e)}")
 
 # Display chapters if available
 if st.session_state.chapters_data:
     st.markdown("### Step 2: Select Chapters to Generate")
+
+    # Add a button to save the JSON response
+    if st.button("Save Chapters Data as JSON"):
+        # Convert the chapters_data to JSON string (the outline structure)
+        json_str = json.dumps(st.session_state.chapters_data, indent=2)
+
+        # Create a download button for the JSON
+        st.download_button(
+            label="Download JSON File",
+            data=json_str,
+            file_name="chapters_data.json",
+            mime="application/json"
+        )
+        st.info("Click the 'Download JSON File' button above to save the chapters data.")
 
     # Display chapters as checkboxes
     selected_chapters = []
@@ -396,7 +509,14 @@ if st.session_state.chapters_data:
 
     # Generate materials for selected chapters
     if st.button("Generate Reading Materials") and selected_chapters:
-        if not deepseek_api_key:
+        # Check if we're using a JSON file that contains complete materials (not just outline)
+        using_complete_materials = (
+            st.session_state.json_file_uploaded and
+            hasattr(st.session_state, 'full_materials_json') and
+            st.session_state.full_materials_json is not None
+        )
+
+        if not deepseek_api_key and not using_complete_materials:
             st.error("Please enter your Deepseek API key in the sidebar")
         else:
             # Clean up previously cached documents and reset flags
@@ -437,7 +557,7 @@ if st.session_state.chapters_data:
                     base_prompt = f"""
                     You are an expert educator. Generate detailed, well-structured reading material for the following chapter and topics.
                     Use your reasoning capabilities to provide comprehensive explanations, examples, and connections between concepts.
-                    Return the response in JSON format with the following structure:
+                    ULTRA_CRITIAL: Return the response in JSON format with the following structure:
                     {{
                         "title": "Chapter Title",
                         "introduction": "Brief introduction to the chapter",
@@ -484,10 +604,14 @@ if st.session_state.chapters_data:
                     """
 
                     # If image generation is enabled, modify the prompt to include image generation
-                    if enable_image_generation:
-                        # Select the specified number of topics randomly for image generation
+                    if enable_image_generation or save_prompts_to_txt:
+                        # Select the specified number of topics for image generation based on which toggle is enabled
                         import random
-                        num_images_to_generate = min(num_images_per_chapter, len(topics))
+                        if enable_image_generation:
+                            num_images_to_generate = min(num_images_per_chapter, len(topics))
+                        else:
+                            num_images_to_generate = min(num_images_for_txt, len(topics))
+
                         selected_topics = random.sample(topics, num_images_to_generate)
                         selected_topics_str = ', '.join(selected_topics)
 
@@ -519,43 +643,57 @@ if st.session_state.chapters_data:
                         prompt = base_prompt
 
                     try:
-                        # Call Deepseek API
-                        headers = {
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {deepseek_api_key}"
-                        }
-
-                        response = requests.post(
-                            "https://api.deepseek.com/chat/completions",
-                            headers=headers,
-                            json={
-                                "model": "deepseek-reasoner",
-                                "messages": [
-                                    {"role": "user", "content": prompt}
-                                ],
-                                "temperature": deepseek_temperature,
-                                "max_tokens": 16000,  # Set token limit to 16k
-                                "response_format": {"type": "json_object"}
-                            }
+                        # Check if we're using a JSON file that contains complete materials (not just outline)
+                        using_complete_materials = (
+                            st.session_state.json_file_uploaded and
+                            hasattr(st.session_state, 'full_materials_json') and
+                            st.session_state.full_materials_json is not None and
+                            chapter_name in st.session_state.full_materials_json
                         )
 
-                        if response.status_code == 200:
-                            result = response.json()
-                            content = result['choices'][0]['message']['content']
-
-                            # Extract JSON from response
-                            import re
-                            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-
-                            if json_match:
-                                json_str = json_match.group()
-                                material_data = json.loads(json_str)
-                                generated_materials[chapter_name] = material_data
-                                st.success(f"✓ Generated material for: {chapter_name}")
-                            else:
-                                st.warning(f"Could not extract JSON for {chapter_name}")
+                        # If we have complete material data for this chapter, use it directly
+                        if using_complete_materials:
+                            material_data = st.session_state.full_materials_json[chapter_name]
+                            generated_materials[chapter_name] = material_data
+                            st.success(f"✓ Loaded material for: {chapter_name} from JSON file")
                         else:
-                            st.error(f"Deepseek API error for {chapter_name}: {response.status_code} - {response.text}")
+                            # Call Deepseek API to generate content
+                            headers = {
+                                "Content-Type": "application/json",
+                                "Authorization": f"Bearer {deepseek_api_key}"
+                            }
+
+                            response = requests.post(
+                                "https://api.deepseek.com/chat/completions",
+                                headers=headers,
+                                json={
+                                    "model": "deepseek-reasoner",
+                                    "messages": [
+                                        {"role": "user", "content": prompt}
+                                    ],
+                                    "temperature": deepseek_temperature,
+                                    "max_tokens": 16000,  # Set token limit to 16k
+                                    "response_format": {"type": "json_object"}
+                                }
+                            )
+
+                            if response.status_code == 200:
+                                result = response.json()
+                                content = result['choices'][0]['message']['content']
+
+                                # Extract JSON from response
+                                import re
+                                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+
+                                if json_match:
+                                    json_str = json_match.group()
+                                    material_data = json.loads(json_str)
+                                    generated_materials[chapter_name] = material_data
+                                    st.success(f"✓ Generated material for: {chapter_name}")
+                                else:
+                                    st.warning(f"Could not extract JSON for {chapter_name}")
+                            else:
+                                st.error(f"Deepseek API error for {chapter_name}: {response.status_code} - {response.text}")
 
                     except requests.exceptions.RequestException as e:
                         st.error(f"Network error while generating material for {chapter_name}: {str(e)}")
@@ -564,10 +702,64 @@ if st.session_state.chapters_data:
                     except Exception as e:
                         st.error(f"Unexpected error while generating material for {chapter_name}: {str(e)}")
 
+                # If save_prompts_to_txt is enabled, save image prompts to a text file with the same name as the generated DOCX files
+                if save_prompts_to_txt and generated_materials:
+                    # Create a text file using the names of the selected chapters
+                    # Use the first few chapter names to create a meaningful filename
+                    chapter_names = list(generated_materials.keys())
+                    if chapter_names:
+                        # Take first chapter name or combine first few if many chapters are selected
+                        if len(chapter_names) == 1:
+                            base_filename = chapter_names[0].replace(' ', '_').replace(':', '_')
+                        else:
+                            # Use first chapter name followed by count of remaining chapters
+                            first_chapter = chapter_names[0].replace(' ', '_').replace(':', '_')
+                            base_filename = f"{first_chapter}_and_{len(chapter_names)-1}_more"
+                    else:
+                        # Fallback to original filename if no materials were generated
+                        base_filename = st.session_state.original_filename or "generated_materials"
+
+                    txt_filename = f"{base_filename}_image_prompts.txt"
+
+                    # Collect all image prompts
+                    all_prompts = []
+                    for chapter_name, content in generated_materials.items():
+                        for topic in content.get("topics", []):
+                            image_prompt = topic.get("image_prompt")
+                            if image_prompt:
+                                all_prompts.append(f"Chapter: {chapter_name}\nTopic: {topic.get('topic', 'N/A')}\nPrompt: {image_prompt}\n---\n")
+
+                    # Create the text content
+                    txt_content = "Generated Image Prompts:\n\n" + "\n".join(all_prompts)
+
+                    # Store the content in session state for download
+                    st.session_state.image_prompts_txt = {
+                        'content': txt_content,
+                        'filename': txt_filename
+                    }
+
+                    st.success(f"Image prompts are ready for download")
+                elif save_prompts_to_txt and not generated_materials:
+                    st.warning("No materials were generated, so no image prompts to save.")
+
                 st.session_state.generated_materials = generated_materials
 
                 if generated_materials:
                     st.success("All reading materials generated successfully!")
+
+                    # Add a button to save the generated materials as JSON
+                    if st.button("Save Generated Materials as JSON"):
+                        # Convert the generated materials to JSON string
+                        json_str = json.dumps(generated_materials, indent=2)
+
+                        # Create a download button for the JSON
+                        st.download_button(
+                            label="Download Generated Materials JSON",
+                            data=json_str,
+                            file_name="generated_materials.json",
+                            mime="application/json"
+                        )
+                        st.info("Click the 'Download Generated Materials JSON' button above to save the complete materials data.")
                 else:
                     st.warning("No materials were generated. Please check the API responses.")
 
@@ -641,6 +833,7 @@ if st.session_state.generated_materials:
                     image_size = float(topic.get("size", "4"))  # Default to 4 inches if no size specified
                     image_generated = None
 
+                    # Only generate images if the nano banana image generation toggle is enabled
                     if enable_image_generation and image_prompt:
                         # Create a unique key for this image based on the prompt
                         image_key = hash(image_prompt)
@@ -827,3 +1020,13 @@ if st.session_state.generated_materials:
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     key=f"download_{chapter_name}"  # Unique key to prevent conflicts
                 )
+
+    # Show download button for image prompts if they were generated
+    if st.session_state.image_prompts_txt:
+        st.download_button(
+            label="Download Image Prompts Text File",
+            data=st.session_state.image_prompts_txt['content'],
+            file_name=st.session_state.image_prompts_txt['filename'],
+            mime="text/plain"
+        )
+        st.info(f"You can download the image prompts text file: {st.session_state.image_prompts_txt['filename']}")

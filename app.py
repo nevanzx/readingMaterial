@@ -465,7 +465,7 @@ if st.session_state.chapters_data:
                     Chapter: {chapter_name}
                     Topics: {', '.join(topics)}
 
-                    - For each topic, generate 3-5 paragraphs depending on the complexity and length of explanation needed.
+                    - ULTRA-CRITIAL: For each topic, generate 3-5 paragraphs depending on the complexity and length of explanation needed.
                     - Ensure the content is comprehensive, well-structured, and suitable for college-level students.
                     - Include a comprehensive summary section that captures the key points from all topics covered in the chapter.
                     - Include a references section with at least 3-5 scholarly sources in APA 7th edition format.

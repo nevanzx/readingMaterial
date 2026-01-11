@@ -3,7 +3,7 @@ import json
 import os
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Inches
+from docx.shared import Inches, Pt
 import requests
 import tempfile
 from io import BytesIO
@@ -36,6 +36,8 @@ def add_formatted_text(paragraph, text):
             italic = False
         elif part:  # Non-empty text content
             run = paragraph.add_run(part)
+            run.font.name = 'Bookman Old Style'
+            run.font.size = Pt(12)  # 12 points
             run.bold = bold
             run.italic = italic
 
@@ -261,6 +263,16 @@ if st.session_state.chapters_data:
                                     "Content paragraph 3"
                                 ]
                             }}
+                        ],
+                        "summary": "Comprehensive summary of the chapter content",
+                        "references": [
+                            {{
+                                "title": "Title of source",
+                                "author": "Author name(s)",
+                                "year": "Publication year",
+                                "publisher": "Publisher name",
+                                "url": "URL if available"
+                            }}
                         ]
                     }}
 
@@ -272,8 +284,13 @@ if st.session_state.chapters_data:
                     Topics: {', '.join(topics)}
 
                     - For each topic, generate 3-5 paragraphs depending on the complexity and length of explanation needed.
-                    - Ensure the content is comprehensive, well-structured, and suitable for college-level students. 
-                    - Add a summary at the end with title.
+                    - Ensure the content is comprehensive, well-structured, and suitable for college-level students.
+                    - Include a comprehensive summary section that captures the key points from all topics covered in the chapter.
+                    - Include a references section with at least 3-5 scholarly sources in APA 7th edition format.
+                    - For references in APA 7th edition format, follow these guidelines:
+                      * Author, A. A. (Year). Title of work. Publisher. URL (if applicable)
+                      * For journal articles: Author, A. A. (Year). Title of article. Title of Periodical, volume(issue), pages. https://doi.org/xx.xxx/yyyy
+                      * For online sources: Author, A. A. (Year, Month Date). Title of webpage. Site Name. URL
                     """
 
                     try:
@@ -346,6 +363,10 @@ if st.session_state.generated_materials:
         # Format the main title heading with 10/72 before line spacing and 6/72 after line spacing
         title_heading.paragraph_format.space_before = Inches(0.1389)  # 10/72 inches
         title_heading.paragraph_format.space_after = Inches(0.0833)   # 6/72 inches
+        # Apply Bookman Old Style font to title
+        for run in title_heading.runs:
+            run.font.name = 'Bookman Old Style'
+            run.font.size = Pt(12)  # 12 points
 
         # Add chapter introduction if available
         introduction = content.get("introduction")
@@ -354,6 +375,10 @@ if st.session_state.generated_materials:
             # Format the heading with 10/72 before line spacing and 6/72 after line spacing
             intro_heading.paragraph_format.space_before = Inches(0.1389)  # 10/72 inches
             intro_heading.paragraph_format.space_after = Inches(0.0833)   # 6/72 inches
+            # Apply Bookman Old Style font to heading
+            for run in intro_heading.runs:
+                run.font.name = 'Bookman Old Style'
+                run.font.size = Pt(12)  # 12 points
 
             # Process introduction with formatting
             intro_para = doc.add_paragraph()
@@ -374,6 +399,10 @@ if st.session_state.generated_materials:
             topic_heading = doc.add_heading(topic.get("topic", "Topic"), level=1)
             topic_heading.paragraph_format.space_before = Inches(0.1389)  # Approximately 10pt (10/72 inches)
             topic_heading.paragraph_format.space_after = Inches(0)   # Approximately 6pt (6/72 inches)
+            # Apply Bookman Old Style font to heading
+            for run in topic_heading.runs:
+                run.font.name = 'Bookman Old Style'
+                run.font.size = Pt(12)  # 12 points
 
             # Handle both single content string and multiple content sections
             topic_content = topic.get("content", "")
@@ -404,6 +433,73 @@ if st.session_state.generated_materials:
 
                 # Add formatted text to the paragraph
                 add_formatted_text(para, topic_content)
+
+        # Add Summary section
+        summary = content.get("summary")
+        if summary:
+            summary_heading = doc.add_heading("Summary", level=1)
+            summary_heading.paragraph_format.space_before = Inches(0.1389)  # Approximately 10pt (10/72 inches)
+            summary_heading.paragraph_format.space_after = Inches(0.0833)   # Approximately 6pt (6/72 inches)
+            # Apply Bookman Old Style font to heading
+            for run in summary_heading.runs:
+                run.font.name = 'Bookman Old Style'
+                run.font.size = Pt(12)  # 12 points
+
+            summary_para = doc.add_paragraph()
+            # Format the paragraph: justified, 6/72 after spacing, 1 tab indent
+            summary_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            summary_para_format = summary_para.paragraph_format
+            summary_para_format.space_after = Inches(0.0833)  # 6/72 inches after paragraph
+            summary_para_format.line_spacing = 1.0  # Single line spacing
+            summary_para_format.first_line_indent = Inches(0.5)  # 0.5 inch indent
+
+            # Add formatted text to the paragraph
+            add_formatted_text(summary_para, summary)
+
+        # Add References section
+        references = content.get("references", [])
+        if references:
+            references_heading = doc.add_heading("References", level=1)
+            references_heading.paragraph_format.space_before = Inches(0.1389)  # Approximately 10pt (10/72 inches)
+            references_heading.paragraph_format.space_after = Inches(0.0833)   # Approximately 6pt (6/72 inches)
+            # Apply Bookman Old Style font to heading
+            for run in references_heading.runs:
+                run.font.name = 'Bookman Old Style'
+                run.font.size = Pt(12)  # 12 points
+
+            for reference in references:
+                ref_para = doc.add_paragraph()
+                # Format the paragraph: justified, 6/72 after spacing, hanging indent of 0.5 inches
+                ref_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                ref_para_format = ref_para.paragraph_format
+                ref_para_format.space_after = Inches(0.0833)  # 6/72 inches after paragraph
+                ref_para_format.line_spacing = 1.0  # Single line spacing
+                # APA style uses a hanging indent of 0.5 inches
+                ref_para_format.first_line_indent = Inches(-0.5)
+                ref_para_format.left_indent = Inches(0.5)
+
+                # Format reference according to APA 7th edition
+                author = reference.get("author", "")
+                year = reference.get("year", "")
+                title = reference.get("title", "")
+                publisher = reference.get("publisher", "")
+                url = reference.get("url", "")
+
+                # Construct APA 7th edition reference
+                apa_reference = ""
+                if author:
+                    apa_reference += f"{author}. "
+                if year:
+                    apa_reference += f"({year}). "
+                if title:
+                    apa_reference += f"<i>{title}</i>. "
+                if publisher:
+                    apa_reference += f"{publisher}."
+                if url:
+                    apa_reference += f" {url}"
+
+                # Add formatted text to the paragraph
+                add_formatted_text(ref_para, apa_reference)
 
         # Save to temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_file:

@@ -599,7 +599,7 @@ if st.session_state.chapters_data:
                       * Author, A. A. (Year). Title of work. Publisher. URL (if applicable)
                       * For journal articles: Author, A. A. (Year). Title of article. Title of Periodical, volume(issue), pages. https://doi.org/xx.xxx/yyyy
                       * For online sources: Author, A. A. (Year, Month Date). Title of webpage. Site Name. URL
-                    - When context locality is 'Philippines' or 'Both', incorporate relevant examples, case studies, and references from the Philippines context if possible. but do not over use "In the Philippines" and the likes phrasing. Write it as if you are from the Philippines.
+                    - When context locality is 'Philippines' or 'Both', incorporate relevant examples, case studies, and references from the Philippines. ONLY MENTION THE WORD "PHILIPPINES" 2 times. The Philippine context must be implied.
                     - When context locality is 'International' or 'Both', include global examples and perspectives.
                     """
 

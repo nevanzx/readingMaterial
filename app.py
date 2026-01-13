@@ -594,6 +594,7 @@ if st.session_state.chapters_data:
                     - ULTRA-CRITICAL: For each topic, generate 3-5 paragraphs content depending on the complexity and length of the needed explanation.
                     - Ensure the content is comprehensive, well-structured, and suitable for college-level students.
                     - Include a comprehensive summary section that captures the key points from all topics covered in the chapter.
+                    - Povide citations form authors.
                     - Include a references section with at least 3-5 scholarly sources in APA 7th edition format.
                     - For references in APA 7th edition format, follow these guidelines:
                       * Author, A. A. (Year). Title of work. Publisher. URL (if applicable)

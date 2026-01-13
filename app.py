@@ -557,7 +557,7 @@ if st.session_state.chapters_data:
                     base_prompt = f"""
                     You are an expert educator. Generate detailed, well-structured reading material for the following chapter and topics.
                     Use your reasoning capabilities to provide comprehensive explanations, examples, and connections between concepts.
-                    ULTRA_CRITIAL: Return the response in JSON format with the following structure:
+                    ULTRA_CRITICAL: Return the response in JSON format with exactly with the following structure:
                     {{
                         "title": "Chapter Title",
                         "introduction": "Brief introduction to the chapter",
@@ -591,7 +591,7 @@ if st.session_state.chapters_data:
                     Chapter: {chapter_name}
                     Topics: {', '.join(topics)}
 
-                    - ULTRA-CRITICAL: For each topic, generate 3-5 paragraphs depending on the complexity and length of explanation needed.
+                    - ULTRA-CRITICAL: For each topic, generate 3-5 paragraphs content depending on the complexity and length of the needed explanation.
                     - Ensure the content is comprehensive, well-structured, and suitable for college-level students.
                     - Include a comprehensive summary section that captures the key points from all topics covered in the chapter.
                     - Include a references section with at least 3-5 scholarly sources in APA 7th edition format.
